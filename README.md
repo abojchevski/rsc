@@ -14,7 +14,7 @@ python setup.py install
 
 
 ## Demo
-See demo.py for a comparison with vanilla Spectral Clustering on the moons dataset.
+See example.ipynb for a comparison with vanilla Spectral Clustering on the moons dataset.
 
 ## Cite
 Please cite our paper if you use this code in your own work.
