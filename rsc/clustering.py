@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import eigs, eigsh
+from scipy.sparse.linalg import eigsh
 from sklearn.neighbors import kneighbors_graph
 from sklearn.cluster import k_means
 
@@ -53,27 +53,6 @@ class RSC:
         else:
             raise ValueError('Choice of graph Laplacian not valid. Please use 0, 1 or 2.')
 
-    def __get_laplacian(self, A):
-        A = A.copy()
-        d = A.sum(0).A1
-        N = A.shape[0]
-
-        if self.laplacian == 0:
-            D = sp.diags(d)
-            L = D - A
-        elif self.laplacian == 1:
-            zero_deg = d == 0
-            D = sp.diags(1/np.where(zero_deg, 1, d))
-            L = sp.eye(N) - D.dot(A)
-            L.setdiag(1 - zero_deg)
-        elif self.laplacian == 2:
-            zero_deg = d == 0
-            D = sp.diags(1 / np.sqrt(np.where(zero_deg, 1, d)))
-            L = sp.eye(N) - D.dot(A).dot(D)
-            L.setdiag(1 - zero_deg)
-
-        return L
-
     def __latent_decomposition(self, X):
         # compute the KNN graph
         A = kneighbors_graph(X=X, n_neighbors=self.nn, metric='euclidean', include_self=False, mode='connectivity')
@@ -86,13 +65,17 @@ class RSC:
         Ag = A.copy()
 
         for it in range(self.n_iter):
-            L = self.__get_laplacian(Ag)
 
-            if self.laplacian in [0, 2]:  # Laplacian is symmetric so eigsh is more efficient
+            # form the unnormalized Laplacian
+            D = sp.diags(Ag.sum(0).A1)
+            L = D - Ag
+
+            # solve the normal eigenvalue problem
+            if self.laplacian == 0:
                 h, H = eigsh(L, self.k, which='SM')
-            else:
-                h, H = eigs(L, self.k, which='SM')
-                h, H = np.real(h), np.real(H)  # keep only the real part since eigs returns complex numbers
+            # solve the generalized eigenvalue problem
+            elif self.laplacian == 1:
+                h, H = eigsh(L, self.k, D, which='SM')
 
             trace = h.sum()
 
@@ -115,7 +98,7 @@ class RSC:
                 # fix for potential numerical instability of the eigenvalues computation
                 h[np.isclose(h, 0)] = 0
 
-                # equation (4) in the paper
+                # equation (5) in the paper
                 p = np.linalg.norm(H[edges[0]] - H[edges[1]], axis=1) \
                     - np.linalg.norm(H[edges[0]] * np.sqrt(h), axis=1) \
                     - np.linalg.norm(H[edges[1]] * np.sqrt(h), axis=1)
