@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import eigsh
-from scipy.sparse.csgraph import laplacian
+from scipy.sparse.linalg import eigs, eigsh
 from sklearn.neighbors import kneighbors_graph
 from sklearn.cluster import k_means
 
@@ -41,13 +40,39 @@ class RSC:
         self.m = m
         self.n_iter = n_iter
         self.verbose = verbose
+        self.laplacian = laplacian
 
-        if laplacian in [0, 1]:
-            self.laplacian = laplacian
+        if laplacian == 0:
+            if self.verbose:
+                print('Using unnormalized Laplacian L')
+        elif laplacian == 1:
+            if self.verbose:
+                print('Using random walk based normalized Laplacian L_rw')
         elif laplacian == 2:
-            raise NotImplementedError('The version for the L_sym graph Laplacian is not implemented yet.')
+            raise NotImplementedError('The symmetric normalized Laplacian L_sym is not implemented yet.')
         else:
             raise ValueError('Choice of graph Laplacian not valid. Please use 0, 1 or 2.')
+
+    def __get_laplacian(self, A):
+        A = A.copy()
+        d = A.sum(0).A1
+        N = A.shape[0]
+
+        if self.laplacian == 0:
+            D = sp.diags(d)
+            L = D - A
+        elif self.laplacian == 1:
+            zero_deg = d == 0
+            D = sp.diags(1/np.where(zero_deg, 1, d))
+            L = sp.eye(N) - D.dot(A)
+            L.setdiag(1 - zero_deg)
+        elif self.laplacian == 2:
+            zero_deg = d == 0
+            D = sp.diags(1 / np.sqrt(np.where(zero_deg, 1, d)))
+            L = sp.eye(N) - D.dot(A).dot(D)
+            L.setdiag(1 - zero_deg)
+
+        return L
 
     def __latent_decomposition(self, X):
         # compute the KNN graph
@@ -60,15 +85,15 @@ class RSC:
         prev_trace = np.inf  # keep track of the trace for convergence
         Ag = A.copy()
 
-        if self.laplacian == 0:
-            normed = False
-        else:
-            normed = True
-
         for it in range(self.n_iter):
+            L = self.__get_laplacian(Ag)
 
-            L = laplacian(Ag, normed=normed)
-            h, H = eigsh(L, self.k, which='SM')
+            if self.laplacian in [0, 2]:  # Laplacian is symmetric so eigsh is more efficient
+                h, H = eigsh(L, self.k, which='SM')
+            else:
+                h, H = eigs(L, self.k, which='SM')
+                h, H = np.real(h), np.real(H)  # keep only the real part since eigs returns complex numbers
+
             trace = np.trace(H.T.dot(L.dot(H)))
 
             if self.verbose:
@@ -86,7 +111,7 @@ class RSC:
             edges = sp.tril(A).nonzero()
             removed_edges = []
 
-            if normed:
+            if self.laplacian == 1:
                 # fix for potential numerical instability of the eigenvalues computation
                 h[np.isclose(h, 0)] = 0
 
