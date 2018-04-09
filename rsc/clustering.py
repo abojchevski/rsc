@@ -67,7 +67,7 @@ class RSC:
         for it in range(self.n_iter):
 
             # form the unnormalized Laplacian
-            D = sp.diags(Ag.sum(0).A1)
+            D = sp.diags(Ag.sum(0).A1).tocsc()
             L = D - Ag
 
             # solve the normal eigenvalue problem
