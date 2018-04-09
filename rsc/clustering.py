@@ -94,7 +94,7 @@ class RSC:
                 h, H = eigs(L, self.k, which='SM')
                 h, H = np.real(h), np.real(H)  # keep only the real part since eigs returns complex numbers
 
-            trace = np.trace(H.T.dot(L.dot(H)))
+            trace = h.sum()
 
             if self.verbose:
                 print('Iter: {} Trace: {:.4f}'.format(it, trace))
