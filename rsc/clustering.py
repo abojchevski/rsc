@@ -23,7 +23,7 @@ class RSC:
     Technical University of Munich, Germany
     """
 
-    def __init__(self, k, nn=15, theta=20, m=0.5, laplacian=1, n_iter=50, verbose=False):
+    def __init__(self, k, nn=15, theta=20, m=0.5, laplacian=1, n_iter=50, normalize=False, verbose=False):
         """
         :param k: number of clusters
         :param nn: number of neighbours to consider for constructing the KNN graph (excluding the node itself)
@@ -31,6 +31,7 @@ class RSC:
         :param m: minimum percentage of neighbours to keep per node (omega_i constraints)
         :param n_iter: number of iterations of the alternating optimization procedure
         :param laplacian: which graph Laplacian to use: 0: L, 1: L_rw, 2: L_sym
+        :param normalize: whether to row normalize the eigen vectors before performing k-means
         :param verbose: verbosity
         """
 
@@ -39,6 +40,7 @@ class RSC:
         self.theta = theta
         self.m = m
         self.n_iter = n_iter
+        self.normalize = normalize
         self.verbose = verbose
         self.laplacian = laplacian
 
@@ -82,9 +84,13 @@ class RSC:
             if self.verbose:
                 print('Iter: {} Trace: {:.4f}'.format(it, trace))
 
-            if prev_trace - trace < 1e-10 or self.theta == 0:
+            if self.theta == 0:
                 # no edges are removed
                 Ac = sp.coo_matrix((N, N), [np.int])
+                break
+
+            if prev_trace - trace < 1e-10:
+                # we have converged
                 break
 
             allowed_to_remove_per_node = deg * self.m
@@ -99,12 +105,12 @@ class RSC:
                 h[np.isclose(h, 0)] = 0
 
                 # equation (5) in the paper
-                p = np.linalg.norm(H[edges[0]] - H[edges[1]], axis=1) \
-                    - np.linalg.norm(H[edges[0]] * np.sqrt(h), axis=1) \
-                    - np.linalg.norm(H[edges[1]] * np.sqrt(h), axis=1)
+                p = np.linalg.norm(H[edges[0]] - H[edges[1]], axis=1) ** 2 \
+                    - np.linalg.norm(H[edges[0]] * np.sqrt(h), axis=1) ** 2 \
+                    - np.linalg.norm(H[edges[1]] * np.sqrt(h), axis=1) ** 2
             else:
                 # equation (4) in the paper
-                p = np.linalg.norm(H[edges[0]] - H[edges[1]], axis=1)
+                p = np.linalg.norm(H[edges[0]] - H[edges[1]], axis=1) ** 2
 
             # greedly remove the worst edges
             for ind in p.argsort()[::-1]:
@@ -134,7 +140,11 @@ class RSC:
         Ag, Ac, H = self.__latent_decomposition(X)
         self.Ag = Ag
         self.Ac = Ac
-        self.H = H
+
+        if self.normalize:
+            self.H = H / np.linalg.norm(H, axis=1)[:, None]
+        else:
+            self.H = H
 
         centroids, labels, *_ = k_means(X=self.H, n_clusters=self.k)
 
