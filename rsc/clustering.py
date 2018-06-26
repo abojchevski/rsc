@@ -93,7 +93,7 @@ class RSC:
                 # we have converged
                 break
 
-            allowed_to_remove_per_node = deg * self.m
+            allowed_to_remove_per_node = (deg * self.m).astype(np.int)
             prev_trace = trace
 
             # consider only the edges on the lower triangular part since we are symmetric
