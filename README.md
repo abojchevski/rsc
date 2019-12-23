@@ -1,5 +1,5 @@
 # Robust Spectral Clustering (RSC)
-<img src="https://www.kdd.in.tum.de/fileadmin/w00bxq/www/rsc/rsc.png" width="500">
+<img src="https://www.in.tum.de/fileadmin/w00bws/daml/rsc/rsc.png" width="500">
 
 Implementation of the method proposed in the paper: "[Robust Spectral Clustering for Noisy Data: Modeling Sparse Corruptions Improves Latent Embeddings](https://dl.acm.org/citation.cfm?id=3098156)", Aleksandar Bojchevski, Yves Matkovic, and Stephan Günnemann, SIGKDD 2017.
 
